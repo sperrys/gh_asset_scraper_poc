@@ -36,7 +36,7 @@ In order for the workflow to run there's a few minor setup steps.
 
 After creation, copy the generated value into an actions secret with the name `GH_SCRAPER_PAT`. Take consideration that any collaboraters can also now use this secret with this permission set in other worflow runs. Depending on circumstance, this might mean you want to remove the secret immediately after running the workflow script. 
 
-![image](https://github.com/user-attachments/assets/581ba81b-e449-4a34-bb79-10267bae41aa")
+![image](https://github.com/user-attachments/assets/581ba81b-e449-4a34-bb79-10267bae41aa)
 
 
 
