@@ -44,4 +44,4 @@ In order for the workflow to run there's a few minor setup steps.
 
 ### Result 
 
-- If everything goes as expected, the result should be a pull request that looks similiar to [this one](https://github.com/sperrys/gh_asset_scraper_poc/pull/2). The migration changes can then be reviewed, and GitHub pages site can be built off the branch for furtger testing
+- If everything goes as expected, the result should be a pull request that looks similiar to [this one](https://github.com/sperrys/gh_asset_scraper_poc/pull/2). The migration changes can then be reviewed, and GitHub pages site can be built off the branch for further testing
