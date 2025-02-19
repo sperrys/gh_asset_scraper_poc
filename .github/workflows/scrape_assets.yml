@@ -1,0 +1,183 @@
+name: Scrape github urls to local assets
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-markdown-assets:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+      with:
+        token: ${{ secrets.GH_PAT }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyGithub gitpython requests
+
+    - name: Update markdown asset references
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        BRANCH_NAME: add-markdown-scanner-${{ github.run_id }}
+        PR_TITLE: "Update asset references - Run ${{ github.run_id }}"
+      run: |
+        python << 'EOF'
+        import os
+        import re
+        import requests
+        import shutil
+        from pathlib import Path
+        from github import Github
+        import git
+        
+        # Config 
+        token = os.environ['GITHUB_TOKEN']
+        workspace = Path(os.environ['GITHUB_WORKSPACE'])
+        repo_reference = os.environ['GITHUB_REPOSITORY']
+        branch_name = os.environ['BRANCH_NAME']
+        
+        asset_folder_name = os.environ.get('ASSETS_FOLDER', 'assets')
+        github_api_url = os.environ.get("GITHUB_API_URL", "https://api.github.com")
+        github_instance_url = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
+        
+        # URL Patterns to Search
+        URL_PATTERNS = [
+            re.compile(fr'{github_instance_url}/user-attachments/assets/[\w\d\-_]+')
+        ]
+        
+        # Initialize GitHub
+        g = Github(token)
+        
+        # Clone the repository locally
+        repo = g.get_repo(repo_reference)
+        repo_name  = repo.name
+        assets_dir = os.path.join(workspace, asset_folder_name)
+        pr_body = "This is an automated pull request that attempts to convert embedded github asset url references into local assets that live in the repo's `assets/` folder.\n\n"
+
+        git_repo = git.Repo(workspace)
+        print(f"Repository {repo_name} cloned successfully to {workspace.resolve()}")
+        
+        # Given a relative file path from the repo root, 
+        # use the GH API to render the blob into html
+        def render_markdown_file_to_html(path):
+            url = f'{github_api_url}/repos/{repo_reference}/contents/{path}'
+            print(url)
+            headers = { 
+                "Authorization": f'Bearer {token}',
+                "Accept" : "application/vnd.github.html+json",
+                "X-GitHub-Api-Version": "2022-11-28"
+            }
+            response = requests.get(url, headers=headers)
+            if response.status_code != 200:
+                raise Exception(f"Failed to render Markdown to HTML: {response.status_code} {response.text}")
+            # Return the rendered HTML content
+            return response.text
+        
+        def remove_prefix(path, prefix):
+            last_index = str(path).rfind(repo_name)
+            if last_index == -1:
+                return str(path)  # repo_name not found, return the original URL
+            return str(path)[last_index + len(repo_name):]
+            
+        
+        def parse_guid_from_cannonical_url(url):
+            return url.split('/')[-1]
+        
+        # Given an html string and a target guid,  
+        # extract the signed_url that's associated with the guid
+        def extract_media_src_from_html(html, guid):
+            # Create a regex pattern to match the GUID in the src attribute
+            pattern = re.compile(rf'<(img)\s+[^>]*(?:src)="([^"]*{guid}[^"]*)"')
+            match = pattern.search(html)
+            if match:
+                return match.group(2)
+            return None
+            
+        # Download the image locally using the signed_url,
+        # saving it in the assets folder 
+        def save_media_src_locally(src, guid):
+            if not os.path.exists(assets_dir):
+                os.makedirs(assets_dir)
+            local_path = os.path.join(assets_dir, guid)
+            response = requests.get(src)
+            if response.status_code == 200:
+                with open(local_path, 'wb') as file:
+                    file.write(response.content)
+                print(f"Media saved locally as {local_path}")
+                return local_path
+            else:
+                print(f"Failed to download media for {guid}")
+                return None
+        
+        # Function to save updated blob content to disk
+        def save_updated_content_to_file(file_path, updated_content):
+            with open(file_path, 'w', encoding='utf-8') as file:
+                file.write(updated_content)
+            print(f"Updated content saved to {file_path}")
+            git_repo.git.add(file_path)
+            git_repo.git.add(assets_dir)
+            # Commit the changes
+            relative_path = remove_prefix(file_path, repo_name)
+            git_repo.index.commit(f"Update {relative_path} with local image references")
+        
+        
+        # Update the url reference to a relative path to the assets folder
+        def replace_references_with_local_file(url, local_asset_path, markdown_file_path, file_content):
+            relative_asset_path = os.path.relpath(local_asset_path, os.path.dirname(markdown_file_path))
+            return file_content.replace(url, relative_asset_path)
+        
+        def process_matches_for_markdown_file(file_ref, matches, file_content):
+            global pr_body
+            num_local_files = 0
+            new_content = file_content
+            relative_file_path = remove_prefix(file_ref, repo_name)
+            html = render_markdown_file_to_html(relative_file_path)
+            print(f'{len(matches)} url matches found in {relative_file_path}, attempting to download image locally and re-write reference(s)...')
+            # For each match in a file, try to extract the media contents and replace the references
+            for match in matches:
+                guid = parse_guid_from_cannonical_url(match)
+                src = extract_media_src_from_html(html, guid)
+                if src is None:
+                    print(f'Unable to extract media src for guid: {guid}')     
+                else:
+                    local_path = save_media_src_locally(src, guid)                
+                    if local_path is not None: 
+                        num_local_files += 1
+                        new_content = replace_references_with_local_file(match, local_path, file_ref, new_content)
+            # Once all the images for a file are downloaded, and their references replaced
+            # Save and commit the new content, update the PR body
+            save_updated_content_to_file(file_ref, new_content) 
+            pr_body = pr_body + f'- {relative_file_path} had {len(matches)} url matches and downloaded {num_local_files} files locally\n'
+            
+        
+        
+        def process_files_and_create_pull_request():
+            # Create and checkout the new branch
+            origin = git_repo.remote(name='origin')
+            git_repo.git.checkout('HEAD', b=branch_name)
+            markdown_files = workspace.glob('**/*.md')
+            # Scan and replace URLs in markdown files
+            for file_ref in markdown_files:
+                with open(file_ref, 'r', encoding='utf-8') as file:
+                    content = file.read()      
+                matches = []
+                for pattern in URL_PATTERNS:
+                    matches = pattern.findall(content)
+                num_matches = len(matches)
+                if num_matches > 0:
+                    process_matches_for_markdown_file(file_ref, matches, content)
+            # Push the new branch to the remote and create a pull request
+            origin.push(branch_name)
+            repo.create_pull(title=os.environ['PR_TITLE'], body=pr_body, head=branch_name, base='main')
+        
+        # Run
+        process_files_and_create_pull_request()
+        EOF
