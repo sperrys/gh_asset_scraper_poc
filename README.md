@@ -30,7 +30,7 @@ To help automate the migration process, this repo demos a custom GitHub action [
 In order for the workflow to run there's a few minor setup steps. 
 
 - `scrape_assets.yml` should be placed in the `.github/workflows` directory like it is in this repo, or would be for  any repo that uses [workflows](https://docs.github.com/en/actions/writing-workflows/about-workflows).
-- In order for the workflow to be able to create a branch and pull request, the user should make a dedicated [personal access token] (https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#about-personal-access-tokens) scoped to the repo, with the minimun permissions attached (see screenshot).
+- In order for the workflow to be able to create a branch and pull request, the user should make a dedicated [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#about-personal-access-tokens) scoped to the repo, with the minimun permissions attached (see screenshot).
 
 ![image](https://github.com/user-attachments/assets/157f07d5-25b6-4975-851d-742682efbbe4)
 
