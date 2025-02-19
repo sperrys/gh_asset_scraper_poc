@@ -38,6 +38,7 @@ In order for the workflow to run there's a few minor setup steps.
 
 ![image](https://github.com/user-attachments/assets/581ba81b-e449-4a34-bb79-10267bae41aa)
 
+- Setup should now be complete, and the script can be [triggered from the actions tab](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/manually-running-a-workflow).  
 
-
+![image](https://github.com/user-attachments/assets/33410d6d-a7e3-4170-87b5-71d9fde6acf2)
 
