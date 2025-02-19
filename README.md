@@ -5,7 +5,7 @@
 
 ### Problem 
 
-For a couple of reasons, github asset urls (eg. https://github.com/user-attachments/assets/guid), embedded in markdown files, don't render on GitHub pages in the same way they do when visiting a repo on GitHub.com. While this pattern had previously worked for GitHub Pages, it's not supported. 
+For a couple of reasons, github asset urls embedded in markdown files, don't render on GitHub pages in the same way they do when viewing a repo on GitHub.com. While this pattern had previously worked for GitHub Pages, it's not supported. 
 
 ### Solution 
 
